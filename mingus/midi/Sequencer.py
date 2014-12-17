@@ -84,6 +84,7 @@ attached to the Sequencer."""
         channel,
         velocity,
         ):
+
         pass
 
     def stop_event(self, channel, note):

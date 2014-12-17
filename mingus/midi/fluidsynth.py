@@ -41,7 +41,7 @@
 
 from mingus.midi.Sequencer import Sequencer
 from mingus.containers.Instrument import MidiInstrument
-from . import pyFluidSynth as fs
+from pyfluidsynth3 import fluidsynth, fluidhandle, fluidsettings, fluidaudiodriver
 import time
 import wave
 
@@ -53,21 +53,22 @@ class FluidSynthSequencer(Sequencer):
     output = None
 
     def init(self):
-        self.fs = fs.Synth()
+        self.handle = fluidhandle.FluidHandle()
+        self.settings = fluidsettings.FluidSettings(self.handle)
+        self.fs = fluidsynth.FluidSynth(self.handle, self.settings)
+        self.driver = None
 
     def __del__(self):
-        self.fs.delete()
+        del self.fs
 
     def start_audio_output(self, driver=None):
         """The optional driver argument can be any of 'alsa', 'oss', 'jack', \
 'portaudio', 'sndmgr', 'coreaudio', 'Direct Sound'. Not all drivers will \
 be available for every platform."""
-
-        self.fs.start(driver)
+        self.driver = fluidaudiodriver.FluidAudioDriver(self.handle, self.fs, self.settings)
 
     def start_recording(self, file='mingus_dump.wav'):
         """Initialize a new wave file for recording"""
-
         w = wave.open(file, 'wb')
         w.setnchannels(2)
         w.setsampwidth(2)
@@ -78,9 +79,7 @@ be available for every platform."""
         """Loads a sound font. This function should be called before your audio can \
 be played, since the instruments are kept in the sf2 file. Retuns True \
 on success, False on failure."""
-
-        self.sfid = self.fs.sfload(sf2)
-        return not self.sfid == -1
+        self.fs.load_soundfont(sf2)
 
     # Implement Sequencer's interface
 
@@ -109,7 +108,8 @@ on success, False on failure."""
         instr,
         bank,
         ):
-        self.fs.program_select(channel, self.sfid, bank, instr)
+        self.fs.program_change(channel, instr)
+        self.fs.bank_select(channel, bank)
 
     def sleep(self, seconds):
         if hasattr(self, 'wav'):
@@ -140,7 +140,6 @@ the audio data. Returns True on success, False on failure."""
             midi.start_audio_output(driver)
         if not midi.load_sound_font(sf2):
             return False
-        midi.fs.program_reset()
         initialized = True
     return True
 
